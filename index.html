@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procedure Builder Prototype</title>
+    <!-- js-yaml library for YAML export -->
+    <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --light-gray: #f8f9fa;
+            --border-color: #dee2e6;
+            --danger-color: #dc3545;
+            --success-color: #28a745;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        body {
+            font-family: var(--font-family);
+            background-color: var(--light-gray);
+            color: #333;
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        h1, h2, h3 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+        .wizard-step { display: none; }
+        .wizard-step.active { display: block; }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        input[type="text"], select, textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        textarea { min-height: 80px; }
+
+        .btn {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+        .btn-primary { background-color: var(--primary-color); color: white; }
+        .btn-secondary { background-color: var(--secondary-color); color: white; }
+        .btn-success { background-color: var(--success-color); color: white; }
+        .btn-danger { background-color: var(--danger-color); color: white; }
+        .btn-light { background-color: #e9ecef; color: #212529; border: 1px solid var(--border-color); }
+
+        .navigation-buttons {
+            margin-top: 2rem;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .table-definition-card {
+            /*border: 1px solid var(--border-color);*/
+            border: 1px solid #888;
+            border-radius: 5px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            background-color: #fdfdfd;
+        }
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .table-name-section {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            flex: 1;
+            max-width: 300px;
+        }
+        .table-name-label {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 0;
+        }
+        .table-name-input {
+            border: 2px solid var(--border-color);
+            background-color: white;
+        }
+        .table-name-input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        }
+        .column-definition {
+            display: grid;
+            grid-template-columns: 1fr 1fr 80px;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: #fafafa;
+        }
+        
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 1000px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-views {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+        .data-table-container {
+            max-height: 400px;
+            overflow: auto;
+            border: 1px solid var(--border-color);
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            text-align: left;
+        }
+        .data-table th { background-color: var(--light-gray); }
+        .data-table td:focus {
+            outline: 2px solid var(--primary-color);
+            background-color: #eef5ff;
+        }
+
+        #json-output, #yaml-output {
+            background-color: #2d2d2d;
+            color: #f1f1f1;
+            padding: 1rem;
+            border-radius: 5px;
+            white-space: pre;
+            overflow-x: auto;
+            max-height: 400px;
+        }
+        
+        /* Progress Tracker Styles */
+        .progress-tracker {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 2rem 0;
+            position: relative;
+        }
+        .progress-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-color: var(--border-color);
+            z-index: 1;
+            transform: translateY(-50%);
+        }
+        .progress-line::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            background-color: var(--primary-color);
+            transition: width 0.3s ease;
+            width: var(--progress-width, 0%);
+        }
+        .progress-step {
+            position: relative;
+            z-index: 2;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: white;
+            border: 3px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: var(--secondary-color);
+        }
+        .progress-step.completed {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+        .progress-step.active {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+            transform: scale(1.1);
+        }
+        .progress-step:hover {
+            transform: scale(1.05);
+        }
+        .step-label {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9rem;
+            white-space: nowrap;
+            color: var(--secondary-color);
+        }
+        .progress-step.active .step-label,
+        .progress-step.completed .step-label {
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Procedure Builder</h1>
+        <p>Follow the steps to define a business procedure, its tables, and its logic.</p>
+
+        <!-- Progress Tracker -->
+        <div class="progress-tracker">
+            <div class="progress-line"></div>
+            <div class="progress-step active" data-step="1" onclick="app.goToStep(1)">
+                1
+                <div class="step-label">Procedure Details</div>
+            </div>
+            <div class="progress-step" data-step="2" onclick="app.goToStep(2)">
+                2
+                <div class="step-label">Input Tables</div>
+            </div>
+            <div class="progress-step" data-step="3" onclick="app.goToStep(3)">
+                3
+                <div class="step-label">Output Tables</div>
+            </div>
+            <div class="progress-step" data-step="4" onclick="app.goToStep(4)">
+                4
+                <div class="step-label">Review & Export</div>
+            </div>
+        </div>
+
+        <!-- Step 1: Procedure Details -->
+        <div id="step-1" class="wizard-step active">
+            <h2>Step 1: Define Procedure Details</h2>
+            <div class="form-group">
+                <label for="proc-name">Procedure Name</label>
+                <input type="text" id="proc-name" placeholder="e.g., Monthly Customer Churn Calculation">
+            </div>
+            <div class="form-group">
+                <label for="proc-summary">Procedure Summary</label>
+                <textarea id="proc-summary" placeholder="Describe the purpose of this procedure."></textarea>
+            </div>
+        </div>
+
+        <!-- Step 2: Input Tables -->
+        <div id="step-2" class="wizard-step">
+            <h2>Step 2: Define Input Tables</h2>
+            <p>These are the tables the procedure will read from.</p>
+            <div id="input-tables-container"></div>
+            <button class="btn btn-success" onclick="app.addTable('input')">+ Add Input Table</button>
+        </div>
+
+        <!-- Step 3: Output Tables -->
+        <div id="step-3" class="wizard-step">
+            <h2>Step 3: Define Output Tables</h2>
+            <p>These are the tables the procedure will create or write to.</p>
+            <div id="output-tables-container"></div>
+            <button class="btn btn-success" onclick="app.addTable('output')">+ Add Output Table</button>
+        </div>
+        
+        <!-- Step 4: Review and Export -->
+        <div id="step-4" class="wizard-step">
+            <h2>Step 4: Review and Export</h2>
+            <p>Review the complete procedure definition below. You can download it as JSON or YAML.</p>
+            
+            <h3>JSON Output</h3>
+            <pre id="json-output"></pre>
+            
+            <h3>YAML Output</h3>
+            <pre id="yaml-output"></pre>
+
+            <div class="export-buttons" style="margin-top: 1rem;">
+                <button class="btn btn-primary" onclick="app.exportFile('json')">Download JSON</button>
+                <button class="btn btn-primary" onclick="app.exportFile('yaml')">Download YAML</button>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="navigation-buttons">
+            <button id="prev-btn" class="btn btn-secondary" style="display: none;">Previous</button>
+            <div>
+                <button id="next-btn" class="btn btn-primary">Next</button>
+                <button id="finish-btn" class="btn btn-success" style="display: none;">Finish & Review</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Table Data Editor -->
+    <div id="data-editor-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 id="modal-table-name">Edit Table Data</h2>
+            <p>You can edit data directly in the grid or use the CSV text area. The two views are synchronized.</p>
+            <div class="modal-views">
+                <div>
+                    <h3>HTML View</h3>
+                    <div class="data-table-container">
+                        <table id="modal-html-table" class="data-table"></table>
+                    </div>
+                     <button class="btn btn-light" onclick="app.addTableRow()">+ Add Row</button>
+                </div>
+                <div>
+                    <h3>CSV View (comma-separated)</h3>
+                    <textarea id="modal-csv-textarea" style="height: 400px; font-family: monospace;"></textarea>
+                </div>
+            </div>
+            <div style="margin-top: 1.5rem; text-align: right;">
+                 <button class="btn btn-primary" onclick="app.saveTableData()">Save & Close</button>
+                 <button class="btn btn-secondary" onclick="app.closeDataEditor()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+(function() {
+    // --- Application State and Data Model ---
+    const state = {
+        currentStep: 1,
+        procedure: {
+            name: '',
+            summary: '',
+            inputTables: [],
+            outputTables: []
+        },
+        // A flat map of all tables for easy lookup by ID
+        allTables: new Map(),
+        // State for the data editor modal
+        editingTableId: null,
+        lastDataViewEdited: 'html' // 'html' or 'csv'
+    };
+
+    // --- DOM Elements ---
+    const stepElements = [
+        document.getElementById('step-1'),
+        document.getElementById('step-2'),
+        document.getElementById('step-3'),
+        document.getElementById('step-4')
+    ];
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const finishBtn = document.getElementById('finish-btn');
+    const procNameInput = document.getElementById('proc-name');
+    const procSummaryInput = document.getElementById('proc-summary');
+
+    // --- The 'app' object exposes public methods to the HTML ---
+    window.app = {
+        // --- Wizard Navigation ---
+        changeStep: function(direction) {
+            // Save current step data before moving
+            this.updateModelFromUI();
+
+            const newStep = state.currentStep + direction;
+            if (newStep < 1 || newStep > 4) return;
+            
+            state.currentStep = newStep;
+            this.renderStep();
+        },
+
+        renderStep: function() {
+            stepElements.forEach((el, index) => {
+                el.classList.toggle('active', index + 1 === state.currentStep);
+            });
+
+            // Update progress tracker
+            this.updateProgressTracker();
+
+            prevBtn.style.display = state.currentStep > 1 ? 'inline-block' : 'none';
+            nextBtn.style.display = state.currentStep < 4 ? 'inline-block' : 'none';
+            finishBtn.style.display = state.currentStep === 3 ? 'inline-block' : 'none';
+            
+            if (state.currentStep === 4) {
+                this.generateFinalOutput();
+            }
+        },
+
+        updateProgressTracker: function() {
+            const progressSteps = document.querySelectorAll('.progress-step');
+            const progressLine = document.querySelector('.progress-line');
+            
+            progressSteps.forEach((step, index) => {
+                const stepNumber = index + 1;
+                step.classList.remove('active', 'completed');
+                
+                if (stepNumber < state.currentStep) {
+                    step.classList.add('completed');
+                } else if (stepNumber === state.currentStep) {
+                    step.classList.add('active');
+                }
+            });
+            
+            // Update progress line width
+            const progressPercentage = ((state.currentStep - 1) / 3) * 100;
+            progressLine.style.setProperty('--progress-width', `${progressPercentage}%`);
+        },
+
+        goToStep: function(targetStep) {
+            if (targetStep < 1 || targetStep > 4) return;
+            
+            // Save current step data before moving
+            this.updateModelFromUI();
+            
+            state.currentStep = targetStep;
+            this.renderStep();
+        },
+
+        // --- Table Management ---
+        addTable: function(tableType) { // 'input' or 'output'
+            const tableId = `table-${Date.now()}`;
+            const newTable = {
+                id: tableId,
+                name: `New ${tableType.charAt(0).toUpperCase() + tableType.slice(1)} Table`,
+                columns: [],
+                data: []
+            };
+
+            state.allTables.set(tableId, newTable);
+            if (tableType === 'input') {
+                state.procedure.inputTables.push(newTable);
+            } else {
+                state.procedure.outputTables.push(newTable);
+            }
+
+            const container = document.getElementById(`${tableType}-tables-container`);
+            container.insertAdjacentHTML('beforeend', this.createTableHTML(newTable));
+            this.bindTableEvents(tableId);
+        },
+        
+        removeTable: function(tableId, tableType) {
+            // Remove from procedure arrays
+            state.procedure.inputTables = state.procedure.inputTables.filter(t => t.id !== tableId);
+            state.procedure.outputTables = state.procedure.outputTables.filter(t => t.id !== tableId);
+            // Remove from master map
+            state.allTables.delete(tableId);
+
+            document.getElementById(tableId).remove();
+        },
+
+        addColumn: function(tableId) {
+            const table = state.allTables.get(tableId);
+            if (!table) return;
+
+            const newColumn = { name: '', type: 'string(50)' };
+            table.columns.push(newColumn);
+            
+            const columnsContainer = document.querySelector(`#${tableId} .columns-container`);
+            columnsContainer.insertAdjacentHTML('beforeend', this.createColumnHTML(tableId, table.columns.length - 1));
+            this.bindColumnEvents(tableId, table.columns.length - 1);
+        },
+        
+        removeColumn: function(tableId, columnIndex) {
+            const table = state.allTables.get(tableId);
+            if (!table) return;
+
+            table.columns.splice(columnIndex, 1);
+            
+            // Re-render all columns for this table to fix indices
+            const columnsContainer = document.querySelector(`#${tableId} .columns-container`);
+            columnsContainer.innerHTML = '';
+            table.columns.forEach((col, i) => {
+                columnsContainer.insertAdjacentHTML('beforeend', this.createColumnHTML(tableId, i));
+                this.bindColumnEvents(tableId, i);
+            });
+        },
+        
+        // --- Data Model Synchronization ---
+        updateModelFromUI: function() {
+            // Step 1: Procedure details
+            state.procedure.name = procNameInput.value;
+            state.procedure.summary = procSummaryInput.value;
+
+            // Steps 2 & 3: Table and Column details
+            state.allTables.forEach(table => {
+                const tableElement = document.getElementById(table.id);
+                if (!tableElement) return;
+
+                table.name = tableElement.querySelector('.table-name-input').value;
+
+                table.columns.forEach((column, index) => {
+                    const columnElement = tableElement.querySelector(`.column-definition[data-column-index='${index}']`);
+                    if (columnElement) {
+                        column.name = columnElement.querySelector('.column-name-input').value;
+                        column.type = columnElement.querySelector('.column-type-select').value;
+                    }
+                });
+            });
+        },
+
+        // --- Data Editor Modal ---
+        openDataEditor: function(tableId) {
+            this.updateModelFromUI(); // Ensure table name/columns are up-to-date
+            state.editingTableId = tableId;
+            const table = state.allTables.get(tableId);
+            if (!table) return;
+
+            document.getElementById('modal-table-name').textContent = `Edit Data for: ${table.name}`;
+            this.renderDataEditorViews(table);
+            document.getElementById('data-editor-modal').style.display = 'flex';
+        },
+
+        closeDataEditor: function() {
+            document.getElementById('data-editor-modal').style.display = 'none';
+            state.editingTableId = null;
+        },
+
+        saveTableData: function() {
+            const table = state.allTables.get(state.editingTableId);
+            if (!table) return;
+            
+            if (state.lastDataViewEdited === 'csv') {
+                this.syncCsvToData(table);
+            } else {
+                this.syncHtmlToData(table);
+            }
+
+            this.closeDataEditor();
+        },
+        
+        addTableRow: function() {
+            const table = state.allTables.get(state.editingTableId);
+            if (!table) return;
+            
+            const newRow = Array(table.columns.length).fill('');
+            table.data.push(newRow);
+            this.renderDataEditorViews(table);
+        },
+        
+        renderDataEditorViews: function(table) {
+            this.renderHtmlTableView(table);
+            this.renderCsvView(table);
+        },
+
+        renderHtmlTableView: function(table) {
+            const tableEl = document.getElementById('modal-html-table');
+            let html = '<thead><tr>';
+            table.columns.forEach(col => html += `<th>${col.name || '(unnamed)'} (${col.type})</th>`);
+            html += '</tr></thead><tbody>';
+
+            table.data.forEach(row => {
+                html += '<tr>';
+                row.forEach(cell => html += `<td contenteditable="true">${this.escapeHtml(cell)}</td>`);
+                // Ensure row has same number of cells as columns
+                for (let i = row.length; i < table.columns.length; i++) {
+                    html += `<td contenteditable="true"></td>`;
+                }
+                html += '</tr>';
+            });
+            html += '</tbody>';
+            tableEl.innerHTML = html;
+        },
+
+        renderCsvView: function(table) {
+            const csvTextarea = document.getElementById('modal-csv-textarea');
+            const csv = table.data.map(row => 
+                row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(',')
+            ).join('\n');
+            csvTextarea.value = csv;
+        },
+
+        syncHtmlToData: function(table) {
+            const tableEl = document.getElementById('modal-html-table');
+            const rows = Array.from(tableEl.querySelectorAll('tbody tr'));
+            table.data = rows.map(tr => 
+                Array.from(tr.querySelectorAll('td')).map(td => td.textContent)
+            );
+        },
+
+        syncCsvToData: function(table) {
+            const csvTextarea = document.getElementById('modal-csv-textarea');
+            const lines = csvTextarea.value.split('\n');
+            table.data = lines.filter(line => line.trim() !== '').map(line => {
+                // Basic CSV parsing - for a real app, use a robust library
+                return line.split(',').map(cell => cell.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+            });
+        },
+
+        // --- Final Output and Export ---
+        generateFinalOutput: function() {
+            this.updateModelFromUI(); // Final sync
+            const finalObject = JSON.parse(JSON.stringify(state.procedure)); // Deep clone to clean up
+
+            // Remove internal IDs before export
+            const cleanTable = (table) => {
+                delete table.id;
+                return table;
+            };
+            finalObject.inputTables = finalObject.inputTables.map(cleanTable);
+            finalObject.outputTables = finalObject.outputTables.map(cleanTable);
+
+            // Display JSON
+            const jsonString = JSON.stringify(finalObject, null, 2);
+            document.getElementById('json-output').textContent = jsonString;
+
+            // Display YAML
+            try {
+                const yamlString = jsyaml.dump(finalObject);
+                document.getElementById('yaml-output').textContent = yamlString;
+            } catch (e) {
+                document.getElementById('yaml-output').textContent = `Error generating YAML: ${e.message}`;
+            }
+        },
+
+        exportFile: function(format) {
+            this.generateFinalOutput();
+            let content = '';
+            let mimeType = '';
+            let filename = `${state.procedure.name || 'procedure'}.${format}`;
+
+            if (format === 'json') {
+                content = document.getElementById('json-output').textContent;
+                mimeType = 'application/json';
+            } else if (format === 'yaml') {
+                content = document.getElementById('yaml-output').textContent;
+                mimeType = 'application/x-yaml';
+            }
+
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        },
+
+        // --- HTML Generation ---
+        createTableHTML: function(table) {
+            const tableType = state.procedure.inputTables.some(t => t.id === table.id) ? 'input' : 'output';
+            return `
+                <div class="table-definition-card" id="${table.id}">
+                    <div class="table-header">
+                        <div class="table-name-section">
+                            <label class="table-name-label">Table Name:</label>
+                            <input type="text" class="table-name-input" value="${this.escapeHtml(table.name)}" placeholder="Enter table name">
+                        </div>
+                        <div>
+                            <button class="btn btn-light" onclick="app.openDataEditor('${table.id}')">Define/Edit Data</button>
+                            <button class="btn btn-danger" onclick="app.removeTable('${table.id}', '${tableType}')">Remove</button>
+                        </div>
+                    </div>
+                    <strong>Columns:</strong>
+                    <div class="columns-container">
+                        ${table.columns.map((col, i) => this.createColumnHTML(table.id, i)).join('')}
+                    </div>
+                    <button class="btn btn-secondary" style="margin-top: 1rem;" onclick="app.addColumn('${table.id}')">+ Add Column</button>
+                </div>
+            `;
+        },
+
+        createColumnHTML: function(tableId, columnIndex) {
+            const table = state.allTables.get(tableId);
+            const column = table.columns[columnIndex];
+            return `
+                <div class="column-definition" data-column-index="${columnIndex}">
+                    <input type="text" class="column-name-input" value="${this.escapeHtml(column.name)}" placeholder="Column Name">
+                    <select class="column-type-select">
+                        <option value="string(50)" ${column.type === 'string(50)' ? 'selected' : ''}>string(50)</option>
+                        <option value="int" ${column.type === 'int' ? 'selected' : ''}>int</option>
+                        <option value="float" ${column.type === 'float' ? 'selected' : ''}>float</option>
+                    </select>
+                    <button class="btn btn-danger btn-sm" onclick="app.removeColumn('${tableId}', ${columnIndex})">X</button>
+                </div>
+            `;
+        },
+        
+        // --- Event Binding ---
+        bindTableEvents: function(tableId) {
+            // Event delegation is better, but for simplicity, we'll direct bind on creation
+            // This could be refactored later if performance becomes an issue.
+        },
+        bindColumnEvents: function(tableId, columnIndex) {
+            // Similar to above, direct onclick is used for simplicity
+        },
+
+        // --- Utilities ---
+        escapeHtml: function(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        },
+
+        // --- Initializer ---
+        init: function() {
+            // Initialize progress tracker
+            this.updateProgressTracker();
+            
+            // Create sample tables with default columns
+            this.createSampleTables();
+            
+            // Bind navigation
+            nextBtn.addEventListener('click', () => this.changeStep(1));
+            finishBtn.addEventListener('click', () => this.changeStep(1));
+            prevBtn.addEventListener('click', () => this.changeStep(-1));
+
+            // Bind data model updates on input
+            procNameInput.addEventListener('input', () => state.procedure.name = procNameInput.value);
+            procSummaryInput.addEventListener('input', () => state.procedure.summary = procSummaryInput.value);
+
+            // Modal data sync listeners
+            const modalHtmlTable = document.getElementById('modal-html-table');
+            const modalCsvTextarea = document.getElementById('modal-csv-textarea');
+
+            modalHtmlTable.addEventListener('input', () => {
+                state.lastDataViewEdited = 'html';
+                this.syncHtmlToData(state.allTables.get(state.editingTableId));
+                this.renderCsvView(state.allTables.get(state.editingTableId));
+            });
+            modalCsvTextarea.addEventListener('input', () => {
+                state.lastDataViewEdited = 'csv';
+                this.syncCsvToData(state.allTables.get(state.editingTableId));
+                this.renderHtmlTableView(state.allTables.get(state.editingTableId));
+            });
+        },
+
+        createSampleTables: function() {
+            // Create sample input table
+            const inputTableId = `table-${Date.now()}`;
+            const inputTable = {
+                id: inputTableId,
+                name: 'Sample Input Table',
+                columns: [
+                    { name: 'id', type: 'int' }
+                ],
+                data: []
+            };
+
+            state.allTables.set(inputTableId, inputTable);
+            state.procedure.inputTables.push(inputTable);
+
+            const inputContainer = document.getElementById('input-tables-container');
+            inputContainer.insertAdjacentHTML('beforeend', this.createTableHTML(inputTable));
+            this.bindTableEvents(inputTableId);
+
+            // Create sample output table
+            const outputTableId = `table-${Date.now() + 1}`;
+            const outputTable = {
+                id: outputTableId,
+                name: 'Sample Output Table',
+                columns: [
+                    { name: 'id', type: 'int' }
+                ],
+                data: []
+            };
+
+            state.allTables.set(outputTableId, outputTable);
+            state.procedure.outputTables.push(outputTable);
+
+            const outputContainer = document.getElementById('output-tables-container');
+            outputContainer.insertAdjacentHTML('beforeend', this.createTableHTML(outputTable));
+            this.bindTableEvents(outputTableId);
+        }
+    };
+
+    // --- Start the application ---
+    document.addEventListener('DOMContentLoaded', () => {
+        app.init();
+    });
+
+})();
+</script>
+
+</body>
+</html>
